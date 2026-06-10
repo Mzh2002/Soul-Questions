@@ -243,7 +243,6 @@ function setupSettings() {
     const closeBtn = document.getElementById('closeSettings');
     const saveBtn = document.getElementById('saveSettingsBtn');
     const clearBtn = document.getElementById('clearSettingsBtn');
-    const providerSelect = document.getElementById('settingsProvider');
 
     btn.addEventListener('click', () => {
         modal.style.display = 'flex';
@@ -264,11 +263,6 @@ function setupSettings() {
 
     saveBtn.addEventListener('click', saveSettings);
     clearBtn.addEventListener('click', clearSettings);
-
-    providerSelect.addEventListener('change', () => {
-        const apiKeyGroup = document.getElementById('apiKeyGroup');
-        apiKeyGroup.style.display = providerSelect.value === 'ollama' ? 'none' : 'block';
-    });
 }
 
 async function loadSettings() {
@@ -277,7 +271,6 @@ async function loadSettings() {
             headers: { 'X-CSRFToken': CSRF_TOKEN },
         });
         const data = await res.json();
-        document.getElementById('settingsProvider').value = data.llm_provider || 'openai';
         document.getElementById('settingsModel').value = data.llm_model || 'gpt-4o-mini';
         document.getElementById('settingsApiKey').value = '';
 
@@ -289,22 +282,17 @@ async function loadSettings() {
             status.textContent = 'No API key configured — using server default';
             status.style.color = '';
         }
-
-        const apiKeyGroup = document.getElementById('apiKeyGroup');
-        apiKeyGroup.style.display = data.llm_provider === 'ollama' ? 'none' : 'block';
     } catch (err) {
         console.error('Failed to load settings', err);
     }
 }
 
 async function saveSettings() {
-    const provider = document.getElementById('settingsProvider').value;
-    const model = document.getElementById('settingsModel').value.trim();
+    const model = document.getElementById('settingsModel').value;
     const apiKey = document.getElementById('settingsApiKey').value.trim();
     const feedback = document.getElementById('settingsFeedback');
 
     const body = {
-        llm_provider: provider,
         llm_model: model || 'gpt-4o-mini',
     };
 
@@ -360,12 +348,10 @@ async function clearSettings() {
                 'X-CSRFToken': CSRF_TOKEN,
             },
             body: JSON.stringify({
-                llm_provider: 'openai',
                 llm_model: 'gpt-4o-mini',
                 api_key: '',
             }),
         });
-        document.getElementById('settingsProvider').value = 'openai';
         document.getElementById('settingsModel').value = 'gpt-4o-mini';
         document.getElementById('settingsApiKey').value = '';
         document.getElementById('apiKeyStatus').textContent = 'No API key configured — using server default';

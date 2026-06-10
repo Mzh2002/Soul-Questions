@@ -11,8 +11,11 @@ from django.views.decorators.http import require_http_methods, require_POST
 from .models import ChatMessage, ChatSession, RecommendedQuestion, RetrievedSource
 from .services import ask_question
 
+ALLOWED_MODELS = {
+    "gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo", "o3-mini",
+}
+
 DEFAULT_SETTINGS = {
-    "llm_provider": "openai",
     "llm_model": "gpt-4o-mini",
     "api_key": "",
 }
@@ -80,7 +83,6 @@ def send_message(request, session_id: int):
     llm_config = None
     if user_settings.get("api_key"):
         llm_config = {
-            "provider": user_settings.get("llm_provider", "openai"),
             "model": user_settings.get("llm_model", "gpt-4o-mini"),
             "api_key": user_settings["api_key"],
         }
@@ -128,10 +130,13 @@ def save_settings(request):
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
+    model = body.get("llm_model", "gpt-4o-mini")
+    if model not in ALLOWED_MODELS:
+        return JsonResponse({"error": f"Model '{model}' is not allowed"}, status=400)
+
     existing = request.session.get("llm_settings", {})
     settings = {
-        "llm_provider": body.get("llm_provider", "openai"),
-        "llm_model": body.get("llm_model", "gpt-4o-mini"),
+        "llm_model": model,
         "api_key": body.get("api_key", existing.get("api_key", "")) if "api_key" in body else existing.get("api_key", ""),
     }
     request.session["llm_settings"] = settings
@@ -146,7 +151,6 @@ def get_settings(request):
     if api_key:
         masked = api_key[:4] + "*" * max(0, len(api_key) - 8) + api_key[-4:] if len(api_key) > 8 else "****"
     return JsonResponse({
-        "llm_provider": settings.get("llm_provider", "openai"),
         "llm_model": settings.get("llm_model", "gpt-4o-mini"),
         "api_key_set": bool(api_key),
         "api_key_masked": masked,
