@@ -1,0 +1,105 @@
+{% load static %}
+{% load chat_extras %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soul Questions — {{ session.title }}</title>
+    <link rel="stylesheet" href="{% static 'chat/css/style.css' %}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">⚔️ Soul Questions</h1>
+                <a href="{% url 'new_session' %}" class="btn-new-chat" title="New Chat">+ New Chat</a>
+            </div>
+            <div class="session-list" id="sessionList">
+                {% for s in sessions %}
+                <div class="session-item {% if s.pk == session.pk %}active{% endif %}"
+                     data-session-id="{{ s.pk }}">
+                    <a href="{% url 'chat_session' s.pk %}" class="session-link">
+                        <span class="session-title" id="title-{{ s.pk }}">{{ s.title }}</span>
+                    </a>
+                    <div class="session-actions">
+                        <button class="btn-icon" onclick="renameSession({{ s.pk }})" title="Rename">✏️</button>
+                        <button class="btn-icon" onclick="deleteSession({{ s.pk }})" title="Delete">🗑️</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="sidebar-footer">
+                <small>Powered by LangGraph + Django</small>
+            </div>
+        </aside>
+
+        <!-- Toggle sidebar button for mobile -->
+        <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">☰</button>
+
+        <!-- Main chat area -->
+        <main class="chat-main">
+            <div class="chat-header">
+                <h2 id="chatTitle">{{ session.title }}</h2>
+            </div>
+
+            <div class="messages-container" id="messagesContainer">
+                {% if not messages %}
+                <div class="welcome-message">
+                    <div class="welcome-icon">⚔️</div>
+                    <h2>Welcome to Soul Questions</h2>
+                    <p>Ask me anything about Dark Souls, Elden Ring, Bloodborne, Sekiro, Demon's Souls, and other Souls-like games.</p>
+                    <div class="suggestion-chips">
+                        <button class="chip" onclick="askSuggestion(this)">Who is the hardest boss in Dark Souls 3?</button>
+                        <button class="chip" onclick="askSuggestion(this)">Explain the lore of the Elden Ring</button>
+                        <button class="chip" onclick="askSuggestion(this)">What builds work best for Bloodborne beginners?</button>
+                        <button class="chip" onclick="askSuggestion(this)">Compare Sekiro's combat to Dark Souls</button>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div id="messagesList">
+                    <!-- Messages rendered by JS -->
+                </div>
+
+                <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                    <div class="assistant-bubble">
+                        <div class="dot-typing">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input area -->
+            <div class="input-area">
+                <form id="chatForm" onsubmit="sendMessage(event)">
+                    {% csrf_token %}
+                    <div class="input-wrapper">
+                        <textarea
+                            id="messageInput"
+                            placeholder="Ask about Souls-like games..."
+                            rows="1"
+                            autofocus
+                        ></textarea>
+                        <button type="submit" class="btn-send" id="sendBtn" title="Send">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13"></path>
+                                <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const SESSION_ID = {{ session.pk }};
+        const CSRF_TOKEN = '{{ csrf_token }}';
+        const INITIAL_MESSAGES = {{ messages|to_json }};
+    </script>
+    <script src="{% static 'chat/js/chat.js' %}"></script>
+</body>
+</html>
