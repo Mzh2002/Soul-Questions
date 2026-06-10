@@ -12,17 +12,18 @@ from .prompts import RECOMMENDATION_PROMPT
 logger = logging.getLogger(__name__)
 
 
-def get_llm() -> Any:
+def get_llm(config: dict[str, str] | None = None) -> Any:
     """Instantiate the configured LLM client."""
-    provider = os.getenv("LLM_PROVIDER", "openai")
-    model = os.getenv("LLM_MODEL", "gpt-4o-mini")
+    provider = (config or {}).get("provider") or os.getenv("LLM_PROVIDER", "openai")
+    model = (config or {}).get("model") or os.getenv("LLM_MODEL", "gpt-4o-mini")
+    api_key = (config or {}).get("api_key") or os.getenv("OPENAI_API_KEY", "")
 
     if provider == "openai":
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             model=model,
             temperature=0.7,
-            api_key=os.getenv("OPENAI_API_KEY", ""),
+            api_key=api_key,
         )
     elif provider == "ollama":
         from langchain_community.chat_models import ChatOllama
@@ -38,6 +39,7 @@ def generate_recommendations(
     question: str,
     answer: str,
     game: str = "",
+    llm_config: dict[str, str] | None = None,
 ) -> list[str]:
     """Generate 3-5 follow-up question recommendations.
 
@@ -45,12 +47,13 @@ def generate_recommendations(
         question: The user's current question.
         answer: The assistant's response.
         game: The detected game context.
+        llm_config: Optional user-provided LLM configuration.
 
     Returns:
         List of recommended follow-up question strings.
     """
     try:
-        llm = get_llm()
+        llm = get_llm(llm_config)
         prompt = RECOMMENDATION_PROMPT.format(
             question=question,
             answer=answer[:1000],

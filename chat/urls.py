@@ -23,4 +23,6 @@ urlpatterns = [
         views.delete_session,
         name="delete_session",
     ),
+    path("settings/save/", views.save_settings, name="save_settings"),
+    path("settings/", views.get_settings, name="get_settings"),
 ]

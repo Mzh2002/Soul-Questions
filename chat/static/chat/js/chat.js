@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     scrollToBottom();
     setupTextarea();
     setupSidebar();
+    setupSettings();
 });
 
 // ---- Message rendering ----
@@ -232,4 +233,150 @@ function setupSidebar() {
             sidebar.classList.remove('open');
         }
     });
+}
+
+// ---- Settings modal ----
+
+function setupSettings() {
+    const btn = document.getElementById('settingsBtn');
+    const modal = document.getElementById('settingsModal');
+    const closeBtn = document.getElementById('closeSettings');
+    const saveBtn = document.getElementById('saveSettingsBtn');
+    const clearBtn = document.getElementById('clearSettingsBtn');
+    const providerSelect = document.getElementById('settingsProvider');
+
+    btn.addEventListener('click', () => {
+        modal.style.display = 'flex';
+        loadSettings();
+    });
+
+    closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.style.display === 'flex') {
+            modal.style.display = 'none';
+        }
+    });
+
+    saveBtn.addEventListener('click', saveSettings);
+    clearBtn.addEventListener('click', clearSettings);
+
+    providerSelect.addEventListener('change', () => {
+        const apiKeyGroup = document.getElementById('apiKeyGroup');
+        apiKeyGroup.style.display = providerSelect.value === 'ollama' ? 'none' : 'block';
+    });
+}
+
+async function loadSettings() {
+    try {
+        const res = await fetch('/settings/', {
+            headers: { 'X-CSRFToken': CSRF_TOKEN },
+        });
+        const data = await res.json();
+        document.getElementById('settingsProvider').value = data.llm_provider || 'openai';
+        document.getElementById('settingsModel').value = data.llm_model || 'gpt-4o-mini';
+        document.getElementById('settingsApiKey').value = '';
+
+        const status = document.getElementById('apiKeyStatus');
+        if (data.api_key_set) {
+            status.textContent = 'Key saved: ' + data.api_key_masked;
+            status.style.color = '#22c55e';
+        } else {
+            status.textContent = 'No API key configured — using server default';
+            status.style.color = '';
+        }
+
+        const apiKeyGroup = document.getElementById('apiKeyGroup');
+        apiKeyGroup.style.display = data.llm_provider === 'ollama' ? 'none' : 'block';
+    } catch (err) {
+        console.error('Failed to load settings', err);
+    }
+}
+
+async function saveSettings() {
+    const provider = document.getElementById('settingsProvider').value;
+    const model = document.getElementById('settingsModel').value.trim();
+    const apiKey = document.getElementById('settingsApiKey').value.trim();
+    const feedback = document.getElementById('settingsFeedback');
+
+    const body = {
+        llm_provider: provider,
+        llm_model: model || 'gpt-4o-mini',
+    };
+
+    // Only include api_key if the user typed a new one
+    if (apiKey) {
+        body.api_key = apiKey;
+    } else {
+        // Preserve existing key by not sending the field — backend merges
+        // But we need to send something; fetch current key state
+        const res = await fetch('/settings/');
+        const current = await res.json();
+        if (current.api_key_set) {
+            // Don't overwrite with empty — just send provider+model
+        } else {
+            body.api_key = '';
+        }
+    }
+
+    try {
+        const res = await fetch('/settings/save/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN,
+            },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        feedback.style.display = 'block';
+        if (data.saved) {
+            feedback.className = 'settings-feedback success';
+            feedback.textContent = 'Settings saved!';
+            setTimeout(() => { feedback.style.display = 'none'; }, 2000);
+            loadSettings();
+        } else {
+            feedback.className = 'settings-feedback error';
+            feedback.textContent = data.error || 'Failed to save';
+        }
+    } catch (err) {
+        feedback.style.display = 'block';
+        feedback.className = 'settings-feedback error';
+        feedback.textContent = 'Network error';
+    }
+}
+
+async function clearSettings() {
+    try {
+        await fetch('/settings/save/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN,
+            },
+            body: JSON.stringify({
+                llm_provider: 'openai',
+                llm_model: 'gpt-4o-mini',
+                api_key: '',
+            }),
+        });
+        document.getElementById('settingsProvider').value = 'openai';
+        document.getElementById('settingsModel').value = 'gpt-4o-mini';
+        document.getElementById('settingsApiKey').value = '';
+        document.getElementById('apiKeyStatus').textContent = 'No API key configured — using server default';
+        document.getElementById('apiKeyStatus').style.color = '';
+
+        const feedback = document.getElementById('settingsFeedback');
+        feedback.style.display = 'block';
+        feedback.className = 'settings-feedback success';
+        feedback.textContent = 'Settings cleared';
+        setTimeout(() => { feedback.style.display = 'none'; }, 2000);
+    } catch (err) {
+        console.error('Failed to clear settings', err);
+    }
 }
