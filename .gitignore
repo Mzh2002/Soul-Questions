@@ -1,3 +1,12 @@
+# Soul Questions data (keep directory structure via .gitkeep)
+data/raw/*.json
+data/raw/*.html
+data/processed/*.json
+data/chunks/*.jsonl
+data/vectorstore/**
+!data/**/.gitkeep
+data/url_manifest.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
