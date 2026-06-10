@@ -10,12 +10,17 @@ from .models import ChatMessage, ChatSession, RecommendedQuestion, RetrievedSour
 logger = logging.getLogger(__name__)
 
 
-def ask_question(session: ChatSession, user_message: str) -> dict[str, Any]:
+def ask_question(
+    session: ChatSession,
+    user_message: str,
+    llm_config: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Process a user question through the RAG pipeline.
 
     Args:
         session: The active ChatSession.
         user_message: The user's question text.
+        llm_config: Optional dict with provider/model/api_key overrides.
 
     Returns:
         Dict with keys: answer, sources, recommendations, assistant_message.
@@ -35,10 +40,13 @@ def ask_question(session: ChatSession, user_message: str) -> dict[str, Any]:
         from rag.graph import get_graph
 
         graph = get_graph()
-        result = graph.invoke({
+        invoke_state: dict[str, Any] = {
             "question": user_message,
             "history": history,
-        })
+        }
+        if llm_config:
+            invoke_state["llm_config"] = llm_config
+        result = graph.invoke(invoke_state)
 
         answer = result.get("answer", "I'm not sure how to answer that.")
         cited_sources = result.get("cited_sources", [])

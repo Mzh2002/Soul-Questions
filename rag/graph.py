@@ -55,12 +55,14 @@ class GraphState(TypedDict, total=False):
     answer: str
     cited_sources: list[dict]
     recommendations: list[str]
+    llm_config: dict[str, str]
 
 
-def _get_llm() -> Any:
-    """Instantiate LLM from environment config."""
-    provider = os.getenv("LLM_PROVIDER", "openai")
-    model = os.getenv("LLM_MODEL", "gpt-4o-mini")
+def _get_llm(config: dict[str, str] | None = None) -> Any:
+    """Instantiate LLM from user config or environment defaults."""
+    provider = (config or {}).get("provider") or os.getenv("LLM_PROVIDER", "openai")
+    model = (config or {}).get("model") or os.getenv("LLM_MODEL", "gpt-4o-mini")
+    api_key = (config or {}).get("api_key") or os.getenv("OPENAI_API_KEY", "")
 
     if provider == "openai":
         from langchain_openai import ChatOpenAI
@@ -68,7 +70,7 @@ def _get_llm() -> Any:
         return ChatOpenAI(
             model=model,
             temperature=0.3,
-            api_key=os.getenv("OPENAI_API_KEY", ""),
+            api_key=api_key,
         )
     elif provider == "ollama":
         from langchain_community.chat_models import ChatOllama
@@ -132,7 +134,7 @@ def query_rewrite(state: GraphState) -> GraphState:
     )
 
     try:
-        llm = _get_llm()
+        llm = _get_llm(state.get("llm_config"))
         prompt = QUERY_REWRITE_PROMPT.format(
             history=history_text, question=state["question"]
         )
@@ -181,7 +183,7 @@ def generate_answer(state: GraphState) -> GraphState:
     )
 
     try:
-        llm = _get_llm()
+        llm = _get_llm(state.get("llm_config"))
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
@@ -214,6 +216,7 @@ def recommend_followups(state: GraphState) -> GraphState:
         question=state["question"],
         answer=state.get("answer", ""),
         game=state.get("detected_game", ""),
+        llm_config=state.get("llm_config"),
     )
     return {**state, "recommendations": recs}
 

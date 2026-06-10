@@ -11,6 +11,12 @@ from django.views.decorators.http import require_http_methods, require_POST
 from .models import ChatMessage, ChatSession, RecommendedQuestion, RetrievedSource
 from .services import ask_question
 
+DEFAULT_SETTINGS = {
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "api_key": "",
+}
+
 
 def index(request):
     """Landing page — redirect to most recent session or create new."""
@@ -69,7 +75,17 @@ def send_message(request, session_id: int):
     if not user_message:
         return JsonResponse({"error": "Empty message"}, status=400)
 
-    result = ask_question(session, user_message)
+    # Pass user's LLM settings if configured
+    user_settings = request.session.get("llm_settings", {})
+    llm_config = None
+    if user_settings.get("api_key"):
+        llm_config = {
+            "provider": user_settings.get("llm_provider", "openai"),
+            "model": user_settings.get("llm_model", "gpt-4o-mini"),
+            "api_key": user_settings["api_key"],
+        }
+
+    result = ask_question(session, user_message, llm_config=llm_config)
 
     return JsonResponse({
         "answer": result["answer"],
@@ -102,3 +118,36 @@ def delete_session(request, session_id: int):
     session = get_object_or_404(ChatSession, pk=session_id)
     session.delete()
     return JsonResponse({"deleted": True})
+
+
+@require_POST
+def save_settings(request):
+    """Save user LLM settings to the Django session."""
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    existing = request.session.get("llm_settings", {})
+    settings = {
+        "llm_provider": body.get("llm_provider", "openai"),
+        "llm_model": body.get("llm_model", "gpt-4o-mini"),
+        "api_key": body.get("api_key", existing.get("api_key", "")) if "api_key" in body else existing.get("api_key", ""),
+    }
+    request.session["llm_settings"] = settings
+    return JsonResponse({"saved": True})
+
+
+def get_settings(request):
+    """Return current user LLM settings (API key masked)."""
+    settings = request.session.get("llm_settings", DEFAULT_SETTINGS)
+    api_key = settings.get("api_key", "")
+    masked = ""
+    if api_key:
+        masked = api_key[:4] + "*" * max(0, len(api_key) - 8) + api_key[-4:] if len(api_key) > 8 else "****"
+    return JsonResponse({
+        "llm_provider": settings.get("llm_provider", "openai"),
+        "llm_model": settings.get("llm_model", "gpt-4o-mini"),
+        "api_key_set": bool(api_key),
+        "api_key_masked": masked,
+    })
