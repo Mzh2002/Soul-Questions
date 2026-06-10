@@ -10,9 +10,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DJANGO_DEBUG=(bool, True),
     DJANGO_ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
+    CSRF_TRUSTED_ORIGINS=(list, []),
+    DATABASE_URL=(str, ""),
     LLM_PROVIDER=(str, "openai"),
     LLM_MODEL=(str, "gpt-4o-mini"),
-    OLLAMA_BASE_URL=(str, "http://localhost:11434"),
     EMBEDDING_PROVIDER=(str, "sentence-transformers"),
     EMBEDDING_MODEL=(str, "all-MiniLM-L6-v2"),
     VECTOR_STORE=(str, "chroma"),
@@ -29,6 +30,7 @@ if env_file.exists():
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="insecure-dev-key-change-me")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
+CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -42,6 +44,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -70,12 +73,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "souls_rag.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+_db_url = env("DATABASE_URL")
+if _db_url:
+    DATABASES = {"default": env.db()}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -91,12 +98,20 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if not DEBUG
+            else "django.contrib.staticfiles.storage.StaticFilesStorage"
+        ),
+    },
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- Soul Questions Config ---
 LLM_PROVIDER = env("LLM_PROVIDER")
 LLM_MODEL = env("LLM_MODEL")
-OLLAMA_BASE_URL = env("OLLAMA_BASE_URL")
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 
 EMBEDDING_PROVIDER = env("EMBEDDING_PROVIDER")
