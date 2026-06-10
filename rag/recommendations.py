@@ -14,25 +14,16 @@ logger = logging.getLogger(__name__)
 
 def get_llm(config: dict[str, str] | None = None) -> Any:
     """Instantiate the configured LLM client."""
-    provider = (config or {}).get("provider") or os.getenv("LLM_PROVIDER", "openai")
+    from langchain_openai import ChatOpenAI
+
     model = (config or {}).get("model") or os.getenv("LLM_MODEL", "gpt-4o-mini")
     api_key = (config or {}).get("api_key") or os.getenv("OPENAI_API_KEY", "")
 
-    if provider == "openai":
-        from langchain_openai import ChatOpenAI
-        return ChatOpenAI(
-            model=model,
-            temperature=0.7,
-            api_key=api_key,
-        )
-    elif provider == "ollama":
-        from langchain_community.chat_models import ChatOllama
-        return ChatOllama(
-            model=model,
-            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-        )
-    else:
-        raise ValueError(f"Unknown LLM provider: {provider}")
+    return ChatOpenAI(
+        model=model,
+        temperature=0.7,
+        api_key=api_key,
+    )
 
 
 def generate_recommendations(
